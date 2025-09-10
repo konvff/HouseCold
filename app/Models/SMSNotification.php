@@ -14,13 +14,16 @@ class SMSNotification extends Model
     protected $fillable = [
         'appointment_id',
         'technician_id',
+        'user_id',
         'type',
         'message',
         'twilio_sid',
         'status',
         'error_message',
         'sent_at',
-        'delivered_at'
+        'delivered_at',
+        'phone_number',
+        'direction'
     ];
 
     protected $casts = [
@@ -38,6 +41,11 @@ class SMSNotification extends Model
     public function technician(): BelongsTo
     {
         return $this->belongsTo(Technician::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function scopeOfType($query, $type)

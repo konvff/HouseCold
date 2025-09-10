@@ -226,4 +226,265 @@ class SMSService implements SMSServiceInterface
 
         return "Appointment for {$appointment->serviceType->name} on {$date} at {$time} taken by {$assignedTechnician->user->name}. Thanks for your availability.";
     }
+
+    /**
+     * Send SMS from technician to user
+     */
+    public function sendTechnicianToUserMessage(Technician $technician, Appointment $appointment, string $message): bool
+    {
+        try {
+            $twilioMessage = $this->twilioClient->messages->create(
+                $appointment->customer_phone,
+                [
+                    'from' => $this->fromNumber,
+                    'body' => $message
+                ]
+            );
+
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $appointment->user_id,
+                'type' => SMSNotificationType::TECHNICIAN_TO_USER->value,
+                'message' => $message,
+                'phone_number' => $appointment->customer_phone,
+                'direction' => 'outbound',
+                'twilio_sid' => $twilioMessage->sid,
+                'status' => SMSNotificationStatus::SENT->value,
+                'sent_at' => now()
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $appointment->user_id,
+                'type' => SMSNotificationType::TECHNICIAN_TO_USER->value,
+                'message' => $message,
+                'phone_number' => $appointment->customer_phone,
+                'direction' => 'outbound',
+                'status' => SMSNotificationStatus::FAILED->value,
+                'error_message' => $e->getMessage(),
+                'sent_at' => now()
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Send SMS from user to technician
+     */
+    public function sendUserToTechnicianMessage(User $user, Technician $technician, Appointment $appointment, string $message): bool
+    {
+        try {
+            $twilioMessage = $this->twilioClient->messages->create(
+                $technician->phone,
+                [
+                    'from' => $this->fromNumber,
+                    'body' => $message
+                ]
+            );
+
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $user->id,
+                'type' => SMSNotificationType::USER_TO_TECHNICIAN->value,
+                'message' => $message,
+                'phone_number' => $technician->phone,
+                'direction' => 'outbound',
+                'twilio_sid' => $twilioMessage->sid,
+                'status' => SMSNotificationStatus::SENT->value,
+                'sent_at' => now()
+            ]);
+
+            return true;
+
+        } catch (\Exception $e) {
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $user->id,
+                'type' => SMSNotificationType::USER_TO_TECHNICIAN->value,
+                'message' => $message,
+                'phone_number' => $technician->phone,
+                'direction' => 'outbound',
+                'status' => SMSNotificationStatus::FAILED->value,
+                'error_message' => $e->getMessage(),
+                'sent_at' => now()
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Process incoming SMS reply
+     */
+    public function processIncomingSMS(string $from, string $to, string $body, string $twilioSid): void
+    {
+        // Find the appointment and technician based on phone numbers
+        $appointment = \App\Models\Appointment::where('customer_phone', $from)
+            ->orWhere('customer_phone', $this->normalizePhoneNumber($from))
+            ->first();
+
+        if (!$appointment) {
+            return;
+        }
+
+        $technician = \App\Models\Technician::where('phone', $to)
+            ->orWhere('phone', $this->normalizePhoneNumber($to))
+            ->first();
+
+        if (!$technician) {
+            return;
+        }
+
+        // Determine if this is a user reply or technician reply
+        $isUserReply = $appointment->customer_phone === $from || $appointment->customer_phone === $this->normalizePhoneNumber($from);
+        $type = $isUserReply ? SMSNotificationType::USER_REPLY : SMSNotificationType::TECHNICIAN_REPLY;
+
+        // Save the incoming message
+        $this->smsRepository->create([
+            'appointment_id' => $appointment->id,
+            'technician_id' => $technician->id,
+            'user_id' => $appointment->user_id,
+            'type' => $type->value,
+            'message' => $body,
+            'phone_number' => $from,
+            'direction' => 'inbound',
+            'twilio_sid' => $twilioSid,
+            'status' => SMSNotificationStatus::SENT->value,
+            'sent_at' => now(),
+            'delivered_at' => now()
+        ]);
+
+        // Handle special commands
+        $this->handleSpecialCommands($appointment, $technician, $body, $isUserReply);
+    }
+
+    /**
+     * Handle special SMS commands
+     */
+    private function handleSpecialCommands(Appointment $appointment, Technician $technician, string $message, bool $isUserReply): void
+    {
+        $message = strtoupper(trim($message));
+
+        if ($isUserReply) {
+            // Handle user commands
+            switch ($message) {
+                case 'YES':
+                case 'ACCEPT':
+                case 'CONFIRM':
+                    // User confirming appointment
+                    $this->sendAcceptanceConfirmation($technician, $appointment);
+                    break;
+                case 'NO':
+                case 'CANCEL':
+                case 'DECLINE':
+                    // User declining appointment
+                    $this->sendCancellationNotification($appointment, $technician);
+                    break;
+            }
+        } else {
+            // Handle technician commands
+            switch ($message) {
+                case 'YES':
+                case 'ACCEPT':
+                    // Technician accepting appointment
+                    $appointment->update(['technician_id' => $technician->id, 'status' => 'confirmed']);
+                    $this->sendAcceptanceConfirmation($technician, $appointment);
+                    $this->notifyAppointmentTaken($appointment, $technician);
+                    break;
+                case 'NO':
+                case 'DECLINE':
+                    // Technician declining appointment
+                    $this->sendDeclineNotification($appointment, $technician);
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Send cancellation notification
+     */
+    private function sendCancellationNotification(Appointment $appointment, Technician $technician): void
+    {
+        $message = "Appointment #{$appointment->id} has been cancelled by the customer. Thank you for your availability.";
+        
+        try {
+            $this->twilioClient->messages->create(
+                $technician->phone,
+                [
+                    'from' => $this->fromNumber,
+                    'body' => $message
+                ]
+            );
+
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $appointment->user_id,
+                'type' => SMSNotificationType::APPOINTMENT_TAKEN->value,
+                'message' => $message,
+                'phone_number' => $technician->phone,
+                'direction' => 'outbound',
+                'status' => SMSNotificationStatus::SENT->value,
+                'sent_at' => now()
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't fail
+        }
+    }
+
+    /**
+     * Send decline notification
+     */
+    private function sendDeclineNotification(Appointment $appointment, Technician $technician): void
+    {
+        $message = "Technician {$technician->user->name} has declined appointment #{$appointment->id}. We'll find another technician for you.";
+        
+        try {
+            $this->twilioClient->messages->create(
+                $appointment->customer_phone,
+                [
+                    'from' => $this->fromNumber,
+                    'body' => $message
+                ]
+            );
+
+            $this->smsRepository->create([
+                'appointment_id' => $appointment->id,
+                'technician_id' => $technician->id,
+                'user_id' => $appointment->user_id,
+                'type' => SMSNotificationType::APPOINTMENT_TAKEN->value,
+                'message' => $message,
+                'phone_number' => $appointment->customer_phone,
+                'direction' => 'outbound',
+                'status' => SMSNotificationStatus::SENT->value,
+                'sent_at' => now()
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't fail
+        }
+    }
+
+    /**
+     * Normalize phone number format
+     */
+    private function normalizePhoneNumber(string $phone): string
+    {
+        // Remove all non-numeric characters
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        
+        // Add +1 if it's a 10-digit US number
+        if (strlen($phone) === 10) {
+            $phone = '+1' . $phone;
+        }
+        
+        return $phone;
+    }
 }

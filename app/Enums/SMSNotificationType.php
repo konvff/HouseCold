@@ -9,6 +9,10 @@ enum SMSNotificationType: string
     case APPOINTMENT_TAKEN = 'appointment_taken';
     case APPOINTMENT_REMINDER = 'appointment_reminder';
     case RESPONSE_RECEIVED = 'response_received';
+    case TECHNICIAN_TO_USER = 'technician_to_user';
+    case USER_TO_TECHNICIAN = 'user_to_technician';
+    case USER_REPLY = 'user_reply';
+    case TECHNICIAN_REPLY = 'technician_reply';
 
     public function label(): string
     {
@@ -18,6 +22,10 @@ enum SMSNotificationType: string
             self::APPOINTMENT_TAKEN => 'Appointment Taken',
             self::APPOINTMENT_REMINDER => 'Appointment Reminder',
             self::RESPONSE_RECEIVED => 'Response Received',
+            self::TECHNICIAN_TO_USER => 'Technician to User',
+            self::USER_TO_TECHNICIAN => 'User to Technician',
+            self::USER_REPLY => 'User Reply',
+            self::TECHNICIAN_REPLY => 'Technician Reply',
         };
     }
 }

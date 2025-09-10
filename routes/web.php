@@ -42,6 +42,44 @@ Route::get('/payment-confirmation/{appointment}', [AppointmentController::class,
 Route::post('/sms/webhook', [SMSWebhookController::class, 'handleIncomingSMS'])->name('sms.webhook');
 Route::post('/sms/delivery-status', [SMSWebhookController::class, 'handleDeliveryStatus'])->name('sms.delivery-status');
 
+// SMS Communication routes (authenticated)
+Route::middleware(['auth'])->group(function () {
+    Route::post('/sms/send-technician-message', [SMSWebhookController::class, 'sendTechnicianMessage'])->name('sms.send-technician');
+    Route::post('/sms/send-user-message', [SMSWebhookController::class, 'sendUserMessage'])->name('sms.send-user');
+    Route::get('/sms/conversation/{appointmentId}', [SMSWebhookController::class, 'getConversation'])->name('sms.conversation');
+});
+
+// Test SMS route (remove in production)
+Route::get('/test-sms', function () {
+    try {
+        $twilioClient = new \Twilio\Rest\Client(
+            config('services.twilio.sid'),
+            config('services.twilio.token')
+        );
+        
+        $message = $twilioClient->messages->create(
+            '+17325958731', // The number you want to test
+            [
+                'from' => config('services.twilio.from'),
+                'body' => 'Hello! This is a test message from your Laravel SMS system. Reply with YES to test the webhook functionality.'
+            ]
+        );
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'Test SMS sent successfully!',
+            'twilio_sid' => $message->sid,
+            'to' => '+17325958731'
+        ]);
+        
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->name('test.sms');
+
 Route::group(['middleware' => 'auth'], function () {
 
     Route::get('dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
