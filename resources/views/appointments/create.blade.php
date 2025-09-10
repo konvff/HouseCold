@@ -286,24 +286,6 @@
         -webkit-text-fill-color: unset;
     }
 
-    .time-slot .technician-info {
-        font-size: 0.9rem;
-        color: #4b5563;
-        display: flex;
-        align-items: center;
-        gap: 0.25rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100%;
-        font-weight: 600;
-        text-align: center;
-    }
-
-    .time-slot .technician-info i {
-        font-size: 0.75rem;
-        color: var(--info-color);
-    }
 
     .time-slot .time-display i {
         color: var(--primary-color);
@@ -315,13 +297,7 @@
         font-weight: 900;
     }
 
-    .time-slot.selected .technician-info {
-        color: #374151;
-        font-weight: 700;
-    }
-
-    .time-slot.selected .time-display i,
-    .time-slot.selected .technician-info i {
+    .time-slot.selected .time-display i {
         color: var(--primary-color);
     }
 
@@ -598,10 +574,6 @@
             font-weight: 800;
         }
 
-        .time-slot .technician-info {
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
 
         .btn-nav {
             width: 100%;
@@ -1115,10 +1087,6 @@
                         <div class="time-display">
                             <i class="fas fa-clock me-2"></i>
                             ${slot.start_time} - ${slot.end_time}
-                                </div>
-                        <div class="technician-info">
-                            <i class="fas fa-user-tie"></i>
-                            <span title="${slot.technician_name}">${slot.technician_name}</span>
                         </div>
                     </div>
                 `).join('')}

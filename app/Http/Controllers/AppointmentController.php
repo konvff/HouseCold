@@ -380,8 +380,6 @@ class AppointmentController extends Controller
                         'start_time' => $currentSlot->format('H:i'),
                         'end_time' => $slotEnd->format('H:i'),
                         'datetime' => $currentSlot->format('Y-m-d H:i:s'),
-                        'technician_id' => $availability->technician_id,
-                        'technician_name' => $availability->technician->user->name,
                         'available' => true
                     ];
                 }
