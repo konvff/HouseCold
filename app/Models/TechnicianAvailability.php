@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\DayOfWeek;
 
 class TechnicianAvailability extends Model
 {
@@ -26,7 +27,8 @@ class TechnicianAvailability extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'is_recurring' => 'boolean',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        'day_of_week' => DayOfWeek::class,
     ];
 
     public function technician()

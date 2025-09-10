@@ -12,12 +12,14 @@
             min-height: 100vh;
             display: flex;
             align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         .register-card {
             background: white;
             border-radius: 15px;
             box-shadow: 0 15px 35px rgba(0,0,0,0.1);
             overflow: hidden;
+            border: none;
         }
         .register-header {
             background: linear-gradient(45deg, #667eea, #764ba2);
@@ -29,6 +31,7 @@
             border-radius: 10px;
             border: 2px solid #e9ecef;
             padding: 12px 15px;
+            transition: all 0.3s ease;
         }
         .form-control:focus {
             border-color: #667eea;
@@ -40,6 +43,22 @@
             border-radius: 10px;
             padding: 12px;
             font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-register:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .input-group-text {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-right: none;
+        }
+        .input-group .form-control {
+            border-left: none;
+        }
+        .input-group:focus-within .input-group-text {
+            border-color: #667eea;
         }
     </style>
 </head>

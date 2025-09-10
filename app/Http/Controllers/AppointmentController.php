@@ -4,38 +4,57 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\ServiceType;
-use App\Models\Technician;
 use App\Models\TechnicianAvailability;
-use App\Models\PaymentHold;
+use App\Repositories\Contracts\AppointmentRepositoryInterface;
+use App\Repositories\Contracts\ServiceTypeRepositoryInterface;
+use App\Repositories\Contracts\TechnicianRepositoryInterface;
+use App\Repositories\Contracts\PaymentHoldRepositoryInterface;
+use App\Services\Contracts\AppointmentServiceInterface;
+use App\Services\Contracts\PaymentServiceInterface;
+use App\Services\Contracts\SMSServiceInterface;
+use App\Enums\AppointmentStatus;
+use App\Enums\PaymentStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use App\Services\CardknoxPaymentService;
 
 class AppointmentController extends Controller
 {
+    public function __construct(
+        private AppointmentRepositoryInterface $appointmentRepository,
+        private ServiceTypeRepositoryInterface $serviceTypeRepository,
+        private TechnicianRepositoryInterface $technicianRepository,
+        private PaymentHoldRepositoryInterface $paymentHoldRepository,
+        private AppointmentServiceInterface $appointmentService,
+        private PaymentServiceInterface $paymentService,
+        private SMSServiceInterface $smsService
+    ) {}
     public function index()
     {
         $appointments = Appointment::with(['serviceType', 'technician'])
             ->orderBy('scheduled_at', 'asc')
             ->paginate(15);
 
-        $serviceTypes = ServiceType::where('is_active', true)->get();
-        $technicians = Technician::where('status', 'active')->get();
+        $serviceTypes = $this->serviceTypeRepository->getActiveServiceTypes();
+        $technicians = $this->technicianRepository->getActiveTechnicians();
 
         return view('appointments.index', compact('appointments', 'serviceTypes', 'technicians'));
     }
 
     public function create()
     {
-        $serviceTypes = ServiceType::where('is_active', true)->get();
-        return view('appointments.create', compact('serviceTypes'));
+        $serviceTypes = $this->serviceTypeRepository->getActiveServiceTypes();
+        $isGuest = !auth()->check();
+        $user = auth()->user();
+
+        return view('appointments.create', compact('serviceTypes', 'isGuest', 'user'));
     }
 
     public function store(Request $request)
     {
         \Log::info('Appointment creation started', $request->all());
 
+        // Same validation rules for both guest and logged-in users
         $request->validate([
             'customer_name' => 'required|string|max:255',
             'customer_phone' => 'required|string|max:20',
@@ -60,19 +79,18 @@ class AppointmentController extends Controller
             'customer_info.zip' => 'required|string'
         ]);
 
-        $serviceType = ServiceType::findOrFail($request->service_type_id);
-        $estimatedCost = ($serviceType->hourly_rate / 60) * $serviceType->estimated_duration_minutes;
+        $serviceType = $this->serviceTypeRepository->find($request->service_type_id);
+        if (!$serviceType) {
+            return back()->withErrors(['service_type_id' => 'Service type not found']);
+        }
 
-        \Log::info('Service type and cost calculated', [
-            'service_type' => $serviceType->name,
-            'estimated_cost' => $estimatedCost
-        ]);
+        $estimatedCost = ($serviceType->hourly_rate / 60) * $serviceType->estimated_duration_minutes;
 
         try {
             DB::beginTransaction();
 
-            // Create appointment
-            $appointment = Appointment::create([
+
+            $appointment = $this->appointmentRepository->create([
                 'customer_name' => $request->customer_name,
                 'customer_phone' => $request->customer_phone,
                 'customer_email' => $request->customer_info['email'] ?? null,
@@ -82,51 +100,35 @@ class AppointmentController extends Controller
                 'service_notes' => $request->service_notes,
                 'estimated_duration_minutes' => $serviceType->estimated_duration_minutes,
                 'estimated_cost' => $estimatedCost,
-                'status' => 'pending'
+                'status' => AppointmentStatus::PENDING->value
             ]);
 
-            // Create payment authorization hold with Cardknox
-            \Log::info('Starting Cardknox payment authorization');
-
-            $cardknoxService = new CardknoxPaymentService();
-            $authResult = $cardknoxService->authorizePayment(
-                $estimatedCost,
+            $authResult = $this->paymentService->authorizePayment(
+                ['amount' => $estimatedCost, 'description' => 'APPOINTMENT_' . $appointment->id],
                 $request->card_data,
-                $request->customer_info,
-                'APPOINTMENT_' . $appointment->id
+                $request->customer_info
             );
 
             if (!$authResult['success']) {
                 throw new \Exception('Payment authorization failed: ' . $authResult['error']);
             }
 
-            \Log::info('Cardknox authorization successful', [
-                'transaction_id' => $authResult['transaction_id'],
-                'auth_code' => $authResult['auth_code']
-            ]);
-
-            \Log::info('Creating PaymentHold record');
-            PaymentHold::create([
-                'appointment_id' => $appointment->id,
+            $paymentData = [
                 'amount' => $estimatedCost,
-                'status' => 'authorized',
-                'cardknox_transaction_id' => $authResult['transaction_id'],
-                'cardknox_auth_code' => $authResult['auth_code'],
+                'transaction_id' => $authResult['transaction_id'],
+                'auth_code' => $authResult['auth_code'],
                 'card_last_four' => substr($request->card_data['card_number'], -4),
-                'card_type' => $this->detectCardType($request->card_data['card_number']),
-                'expires_at' => Carbon::now()->addDays(7)
-            ]);
-            \Log::info('PaymentHold record created successfully');
+                'card_type' => $this->detectCardType($request->card_data['card_number'])
+            ];
 
-            // Find available technicians and send SMS notifications
-            \Log::info('Notifying available technicians');
-            $this->notifyAvailableTechnicians($appointment);
+            $this->paymentService->createPaymentHold($appointment, $paymentData);
+            $notificationsSent = $this->smsService->notifyAvailableTechnicians($appointment);
 
             DB::commit();
             \Log::info('Appointment creation completed successfully');
 
-            return redirect()->route('appointments.show', $appointment)
-                ->with('success', 'Appointment booked successfully! We will notify you when a technician accepts.');
+            return redirect()->route('payments.confirmation', $appointment)
+                ->with('success', "Appointment booked successfully! SMS notifications sent to {$notificationsSent} available technicians. We will notify you when a technician accepts.");
 
         } catch (\Exception $e) {
             \Log::error('Appointment creation failed', [
@@ -177,6 +179,14 @@ class AppointmentController extends Controller
     // Note: autoCapturePayment method has been removed to prevent duplicate charging
     // Payment capture is now handled exclusively by TechnicianController when timer is stopped
 
+    public function paymentConfirmation(Appointment $appointment)
+    {
+        $isGuest = !auth()->check();
+        $user = auth()->user();
+
+        return view('payments.confirmation', compact('appointment', 'isGuest', 'user'));
+    }
+
     private function sendPaymentConfirmation(Appointment $appointment, $amount)
     {
         // TODO: Implement customer notification
@@ -199,9 +209,8 @@ class AppointmentController extends Controller
             'status' => 'confirmed'
         ]);
 
-        // Send SMS notification to the assigned technician
         if ($appointment->technician) {
-            $this->sendSMSNotification($appointment->technician, $appointment);
+            $this->smsService->sendAcceptanceConfirmation($appointment->technician, $appointment);
         }
 
         return redirect()->route('appointments.index')
@@ -253,7 +262,8 @@ class AppointmentController extends Controller
                 return back()->withErrors(['error' => 'Failed to capture payment: ' . $captureResult['error']]);
             }
 
-            return back()->with('success', 'Payment captured successfully! Amount: $' . number_format($actualCost, 2));
+            return redirect()->route('payments.confirmation', $appointment)
+                ->with('success', 'Payment captured successfully! Amount: $' . number_format($actualCost, 2));
 
         } catch (\Exception $e) {
             return back()->withErrors(['error' => 'Failed to capture payment: ' . $e->getMessage()]);
@@ -393,45 +403,6 @@ class AppointmentController extends Controller
         ]);
     }
 
-    private function notifyAvailableTechnicians(Appointment $appointment)
-    {
-        $scheduledDate = Carbon::parse($appointment->scheduled_at);
-        $dayOfWeek = strtolower($scheduledDate->format('l'));
-
-        $availableTechnicians = TechnicianAvailability::where('day_of_week', $dayOfWeek)
-            ->where('is_active', true)
-            ->whereHas('technician', function($query) {
-                $query->where('status', 'active');
-            })
-            ->get();
-
-        foreach ($availableTechnicians as $availability) {
-            // Send SMS notification to technician
-            $this->sendSMSNotification($availability->technician, $appointment);
-        }
-    }
-
-    private function sendSMSNotification($technician, $appointment)
-    {
-        // Implementation for Twilio SMS
-        // This would integrate with your Twilio configuration
-        try {
-            $client = new \Twilio\Rest\Client(
-                config('services.twilio.sid'),
-                config('services.twilio.token')
-            );
-
-            $message = $client->messages->create(
-                $technician->phone,
-                [
-                    'from' => config('services.twilio.from'),
-                    'body' => "New appointment request at {$appointment->scheduled_at->format('M j, Y g:i A')}, {$appointment->serviceType->name}, {$appointment->customer_address}. Reply YES to accept."
-                ]
-            );
-        } catch (\Exception $e) {
-            \Log::error('Failed to send SMS: ' . $e->getMessage());
-        }
-    }
 
     public function cancelAppointment(Appointment $appointment)
     {

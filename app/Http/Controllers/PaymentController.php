@@ -3,12 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
-use App\Models\PaymentHold;
+use App\Repositories\Contracts\AppointmentRepositoryInterface;
+use App\Repositories\Contracts\PaymentHoldRepositoryInterface;
+use App\Services\Contracts\PaymentServiceInterface;
+use App\Enums\PaymentStatus;
 use Illuminate\Http\Request;
-use App\Services\CardknoxPaymentService;
 
 class PaymentController extends Controller
 {
+    public function __construct(
+        private AppointmentRepositoryInterface $appointmentRepository,
+        private PaymentHoldRepositoryInterface $paymentHoldRepository,
+        private PaymentServiceInterface $paymentService
+    ) {}
     public function createPaymentIntent(Request $request)
     {
         $request->validate([
@@ -31,31 +38,27 @@ class PaymentController extends Controller
         ]);
 
         try {
-            $appointment = Appointment::findOrFail($request->appointment_id);
+            $appointment = $this->appointmentRepository->find($request->appointment_id);
+            if (!$appointment) {
+                return response()->json(['error' => 'Appointment not found'], 404);
+            }
 
-            // Use Cardknox to authorize payment (hold funds)
-            $cardknoxService = new CardknoxPaymentService();
-            $authResult = $cardknoxService->authorizePayment(
-                $request->amount,
+            $authResult = $this->paymentService->authorizePayment(
+                ['amount' => $request->amount, 'description' => 'APPOINTMENT_' . $request->appointment_id],
                 $request->card_data,
-                $request->customer_info,
-                'APPOINTMENT_' . $request->appointment_id
+                $request->customer_info
             );
 
             if ($authResult['success']) {
-                // Create or update payment hold record
-                $paymentHold = PaymentHold::updateOrCreate(
-                    ['appointment_id' => $request->appointment_id],
-                    [
-                        'amount' => $request->amount,
-                        'status' => 'authorized',
-                        'cardknox_transaction_id' => $authResult['transaction_id'],
-                        'cardknox_auth_code' => $authResult['auth_code'],
-                        'card_last_four' => substr($request->card_data['card_number'], -4),
-                        'card_type' => $this->detectCardType($request->card_data['card_number']),
-                        'expires_at' => now()->addDays(7) // Authorization hold expires in 7 days
-                    ]
-                );
+                $paymentData = [
+                    'amount' => $request->amount,
+                    'transaction_id' => $authResult['transaction_id'],
+                    'auth_code' => $authResult['auth_code'],
+                    'card_last_four' => substr($request->card_data['card_number'], -4),
+                    'card_type' => $this->detectCardType($request->card_data['card_number'])
+                ];
+
+                $paymentHold = $this->paymentService->createPaymentHold($appointment, $paymentData);
 
                 return response()->json([
                     'success' => true,

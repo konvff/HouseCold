@@ -1,84 +1,652 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Book Appointment - HouseCall Pro</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+@extends('layouts.guest')
+
+@section('title', 'Book Appointment')
+
+@push('styles')
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <!-- Cardknox integration script -->
     <style>
-        .form-container {
-            max-width: 800px;
+    :root {
+        --primary-color: #3b82f6;
+        --secondary-color: #10b981;
+
+        --success-color: #059669;
+        --warning-color: #f59e0b;
+        --danger-color: #ef4444;
+        --info-color: #06b6d4;
+        --light-bg: rgba(255, 255, 255, 0.95);
+        --glass-bg: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.2);
+        --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --shadow-medium: 0 10px 25px rgba(0, 0, 0, 0.15);
+        --shadow-heavy: 0 20px 40px rgba(0, 0, 0, 0.2);
+        --border-radius: 12px;
+        --border-radius-lg: 20px;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        --transition-slow: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .appointment-container {
+        max-width: 900px;
             margin: 0 auto;
-            padding: 20px;
-        }
+        padding: 2rem 1rem;
+        position: relative;
+    }
+
+    .appointment-header {
+        text-align: center;
+        margin-bottom: 3rem;
+        animation: slideInDown 0.8s ease-out;
+    }
+
+    .appointment-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+
+    .appointment-header h1::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 4px;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border-radius: 2px;
+        animation: expandLine 1s ease-out 0.5s both;
+    }
+
+    .appointment-header .lead {
+        font-size: 1.2rem;
+        color: rgba(255, 255, 255, 0.95);
+        font-weight: 500;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        animation: fadeInUp 0.8s ease-out 0.3s both;
+    }
+
+    /* Enhanced Step Indicator */
         .step-indicator {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 30px;
-        }
-        .step {
-            flex: 1;
-            text-align: center;
-            padding: 10px;
-            border-bottom: 3px solid #e9ecef;
-            color: #6c757d;
-        }
+        margin: 3rem 0;
+        position: relative;
+        padding: 0 2rem;
+    }
+
+    .step-indicator::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 2rem;
+        right: 2rem;
+        height: 3px;
+        background: linear-gradient(90deg, var(--glass-bg), var(--glass-border));
+        border-radius: 2px;
+        z-index: 1;
+        animation: progressLine 1.5s ease-out 1s both;
+    }
+
+    .step-indicator::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 2rem;
+        width: 0%;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        border-radius: 2px;
+        z-index: 2;
+        transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step {
+        background: var(--light-bg);
+        backdrop-filter: blur(20px);
+        padding: 1rem 1.5rem;
+        border-radius: var(--border-radius-lg);
+        border: 2px solid var(--glass-border);
+        position: relative;
+        z-index: 3;
+        font-weight: 600;
+        color: #1f2937;
+        transition: var(--transition-slow);
+        cursor: pointer;
+        min-width: 140px;
+        text-align: center;
+        box-shadow: var(--shadow-light);
+        animation: stepAppear 0.6s ease-out both;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .step:nth-child(1) { animation-delay: 0.1s; }
+    .step:nth-child(2) { animation-delay: 0.2s; }
+    .step:nth-child(3) { animation-delay: 0.3s; }
+    .step:nth-child(4) { animation-delay: 0.4s; }
+
+    .step::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        border-radius: var(--border-radius-lg);
+        z-index: -1;
+        opacity: 0;
+        transition: var(--transition);
+    }
+
+    .step:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-medium);
+    }
+
         .step.active {
-            border-bottom-color: #007bff;
-            color: #007bff;
-            font-weight: bold;
-        }
+        color: white;
+        transform: translateY(-5px) scale(1.05);
+        box-shadow: var(--shadow-heavy);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .step.active::before {
+        opacity: 1;
+    }
+
         .step.completed {
-            border-bottom-color: #28a745;
-            color: #28a745;
-        }
+        color: white;
+        background: linear-gradient(135deg, var(--success-color), #059669);
+        border-color: var(--success-color);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .step.completed::after {
+        content: '✓';
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 24px;
+        height: 24px;
+        background: var(--success-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        animation: checkmark 0.5s ease-out;
+    }
+
+    /* Form Sections */
         .form-section {
             display: none;
+        animation: sectionSlideIn 0.6s ease-out;
+        opacity: 0;
+        transform: translateX(30px);
         }
+
         .form-section.active {
             display: block;
-        }
-        .time-slot {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    .form-section.slide-out {
+        animation: sectionSlideOut 0.4s ease-in;
+    }
+
+    /* Enhanced Cards */
+    .form-card {
+        background: var(--light-bg);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--shadow-medium);
+        overflow: hidden;
+        transition: var(--transition);
+        position: relative;
+    }
+
+    .form-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+    }
+
+    .form-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-heavy);
+    }
+
+    .card-header {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--glass-border);
+        padding: 1.5rem;
+    }
+
+    .card-header h5 {
+        color: var(--primary-color);
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-body {
+        padding: 2rem;
+    }
+
+    /* Time Slots */
+    .time-slots-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .time-slot {
+        border: 2px solid var(--glass-border);
+        border-radius: var(--border-radius);
+        padding: 1.75rem 1.25rem;
+        cursor: pointer;
+        transition: var(--transition);
+        text-align: center;
+        background: var(--light-bg);
+        backdrop-filter: blur(10px);
+        position: relative;
+        overflow: hidden;
+        min-height: 130px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .time-slot .time-display {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 0.75rem;
+        line-height: 1.3;
+        text-shadow: none;
+        background: none;
+        -webkit-background-clip: unset;
+        -webkit-text-fill-color: unset;
+    }
+
+    .time-slot .technician-info {
+        font-size: 0.9rem;
+        color: #4b5563;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+        font-weight: 600;
+        text-align: center;
+    }
+
+    .time-slot .technician-info i {
+        font-size: 0.75rem;
+        color: var(--info-color);
+    }
+
+    .time-slot .time-display i {
+        color: var(--primary-color);
+    }
+
+    /* Enhanced selection state */
+    .time-slot.selected .time-display {
+        color: #1f2937;
+        font-weight: 900;
+    }
+
+    .time-slot.selected .technician-info {
+        color: #374151;
+        font-weight: 700;
+    }
+
+    .time-slot.selected .time-display i,
+    .time-slot.selected .technician-info i {
+        color: var(--primary-color);
+    }
+
+    .time-slot::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
         .time-slot:hover {
-            border-color: #007bff;
-            background-color: #f8f9fa;
+        border-color: var(--primary-color);
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-light);
         }
+
+    .time-slot:hover::before {
+        left: 100%;
+    }
+
         .time-slot.selected {
-            border-color: #007bff;
-            background-color: #e3f2fd;
-        }
+        border-color: var(--primary-color);
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: var(--shadow-medium);
+    }
+
+    .time-slot.selected::after {
+        content: '✓';
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 20px;
+        height: 20px;
+        background: var(--primary-color);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: bold;
+        animation: checkmark 0.3s ease-out;
+    }
+
+    /* Enhanced Buttons */
+    .btn-nav {
+        padding: 0.875rem 2.5rem;
+        border-radius: var(--border-radius);
+        font-weight: 600;
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+        border: none;
+    }
+
+    .btn-nav::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn-nav:hover::before {
+        left: 100%;
+    }
+
+    .btn-primary-nav {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary-nav:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-secondary-nav {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        color: white;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-secondary-nav:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+        color: white;
+    }
+
+    /* Payment Form */
         .payment-form {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--border-radius-lg);
+        padding: 2rem;
+        margin-top: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .payment-form::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--success-color), #059669);
+    }
+
+    /* Animations */
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes expandLine {
+        from {
+            width: 0;
+        }
+        to {
+            width: 80px;
+        }
+    }
+
+    @keyframes progressLine {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes stepAppear {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    @keyframes sectionSlideIn {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes sectionSlideOut {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+    }
+
+    @keyframes checkmark {
+        0% {
+            transform: scale(0);
+        }
+        50% {
+            transform: scale(1.2);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @keyframes bounceIn {
+        0% {
+            opacity: 0;
+            transform: scale(0.3);
+        }
+        50% {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        70% {
+            transform: scale(0.9);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .appointment-container {
+            padding: 1rem 0.5rem;
+        }
+
+        .appointment-header h1 {
+            font-size: 2rem;
+        }
+
+        .step-indicator {
+            flex-direction: column;
+            gap: 1rem;
+            padding: 0;
+        }
+
+        .step-indicator::before,
+        .step-indicator::after {
+            display: none;
+        }
+
+        .step {
+            min-width: auto;
+            width: 100%;
+        }
+
+        .time-slots-container {
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .time-slot {
+            min-height: 110px;
+            padding: 1.25rem 0.75rem;
+        }
+
+        .time-slot .time-display {
+            font-size: 1.1rem;
+            font-weight: 800;
+        }
+
+        .time-slot .technician-info {
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .btn-nav {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .appointment-header h1 {
+            font-size: 1.75rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .time-slots-container {
+            grid-template-columns: 1fr;
+        }
         }
     </style>
-</head>
-<body>
-    <div class="container-fluid">
-        <div class="form-container">
-            <div class="text-center mb-4">
-                <h1><i class="fas fa-calendar-plus text-primary"></i> Book Your Appointment</h1>
+@endpush
+
+@section('content')
+<div class="appointment-container">
+    <!-- Header Section -->
+    <div class="appointment-header">
+        <h1><i class="fas fa-calendar-plus me-3"></i>Book Your Appointment</h1>
                 <p class="lead">Schedule a professional service at your convenience</p>
             </div>
 
-            <!-- Step Indicator -->
+    <!-- Enhanced Step Indicator -->
             <div class="step-indicator">
-                <div class="step active" id="step-1">1. Service & Time</div>
-                <div class="step" id="step-2">2. Details</div>
-                <div class="step" id="step-3">3. Payment</div>
-                <div class="step" id="step-4">4. Confirmation</div>
+        <div class="step active" id="step-1" data-step="1">
+            <i class="fas fa-tools me-2"></i>Service & Time
+        </div>
+        <div class="step" id="step-2" data-step="2">
+            <i class="fas fa-user me-2"></i>Details
+        </div>
+        <div class="step" id="step-3" data-step="3">
+            <i class="fas fa-credit-card me-2"></i>Payment
+        </div>
+        <div class="step" id="step-4" data-step="4">
+            <i class="fas fa-check-circle me-2"></i>Confirmation
+        </div>
             </div>
 
             <form id="appointment-form" method="POST" action="{{ route('appointments.store') }}">
@@ -86,9 +654,20 @@
 
                 <!-- Step 1: Service & Time Selection -->
                 <div class="form-section active" id="section-1">
-                    <div class="card">
+                    <div class="card form-card">
                         <div class="card-header">
                             <h5><i class="fas fa-tools me-2"></i>Select Service & Time</h5>
+                            @if($isGuest)
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                You're booking as a guest. You can create an account during checkout for easier future bookings.
+                            </small>
+                            @else
+                            <small class="text-success">
+                                <i class="fas fa-user-check me-1"></i>
+                                Welcome back, {{ $user?->name ?? 'User' }}! Your profile information will be pre-filled.
+                            </small>
+                            @endif
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
@@ -110,7 +689,7 @@
 
                             <div class="mb-3">
                                 <label class="form-label">Available Time Slots</label>
-                                <div id="time-slots" class="row">
+                                <div id="time-slots" class="time-slots-container">
                                     <div class="col-12 text-center">
                                         <p class="text-muted">Select a service and date to see available time slots</p>
                                     </div>
@@ -118,10 +697,10 @@
                             </div>
 
                             <div class="d-flex justify-content-between">
-                                <button type="button" class="btn btn-secondary" onclick="window.location.href='{{ route('home') }}'">
+                                <button type="button" class="btn btn-nav btn-secondary-nav" onclick="window.location.href='{{ route('home') }}'">
                                     <i class="fas fa-arrow-left me-2"></i>Back
                                 </button>
-                                <button type="button" class="btn btn-primary" onclick="nextStep()" id="next-btn-1" disabled>
+                                <button type="button" class="btn btn-nav btn-primary-nav" onclick="nextStep()" id="next-btn-1" disabled>
                                     Next<i class="fas fa-arrow-right ms-2"></i>
                                 </button>
                             </div>
@@ -131,7 +710,7 @@
 
                 <!-- Step 2: Customer Details -->
                 <div class="form-section" id="section-2">
-                    <div class="card">
+                    <div class="card form-card">
                         <div class="card-header">
                             <h5><i class="fas fa-user me-2"></i>Your Information</h5>
                         </div>
@@ -139,27 +718,36 @@
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="customer_name" class="form-label">Full Name *</label>
-                                    <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                                    <input type="text" class="form-control" id="customer_name" name="customer_name"
+                                           value="{{ $user?->name ?? '' }}" required>
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="customer_phone" class="form-label">Phone Number *</label>
-                                    <input type="tel" class="form-control" id="customer_phone" name="customer_phone" required>
+                                    <input type="tel" class="form-control" id="customer_phone" name="customer_phone"
+                                           value="{{ $user?->phone ?? '' }}" required>
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label for="customer_address" class="form-label">Service Address *</label>
-                                <textarea class="form-control" id="customer_address" name="customer_address" rows="3" required></textarea>
+                                <textarea class="form-control" id="customer_address" name="customer_address" rows="3" required>{{ $user?->location ?? '' }}</textarea>
                             </div>
+                            @if($isGuest)
+                            <div class="mb-3">
+                                <label for="customer_email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="customer_email" name="customer_email"
+                                       placeholder="Optional - for appointment updates">
+                            </div>
+                            @endif
                             <div class="mb-3">
                                 <label for="service_notes" class="form-label">Additional Notes</label>
                                 <textarea class="form-control" id="service_notes" name="service_notes" rows="3" placeholder="Any specific requirements or details about your service..."></textarea>
                             </div>
 
                             <div class="d-flex justify-content-between">
-                                <button type="button" class="btn btn-secondary" onclick="prevStep()">
+                                <button type="button" class="btn btn-nav btn-secondary-nav" onclick="prevStep()">
                                     <i class="fas fa-arrow-left me-2"></i>Previous
                                 </button>
-                                <button type="button" class="btn btn-primary" onclick="nextStep()">
+                                <button type="button" class="btn btn-nav btn-primary-nav" onclick="nextStep()">
                                     Next<i class="fas fa-arrow-right ms-2"></i>
                                 </button>
                             </div>
@@ -277,19 +865,79 @@
 
                 <!-- Step 4: Confirmation -->
                 <div class="form-section" id="section-4">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5><i class="fas fa-check-circle me-2"></i>Appointment Confirmed</h5>
+                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white;">
+                        <div class="card-header" style="background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: none;">
+                            <h5 class="mb-0" style="color: white;">
+                                <i class="fas fa-check-circle me-2" style="color: #4ade80;"></i>🎉 Payment Confirmed!
+                            </h5>
                         </div>
-                        <div class="card-body text-center">
-                            <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
-                            <h4 class="mt-3">Thank You!</h4>
-                            <p class="lead">Your appointment has been scheduled successfully.</p>
-                            <p>We'll notify you when a technician accepts your appointment.</p>
-                            <div class="mt-4">
-                                <a href="{{ route('home') }}" class="btn btn-primary">
+                        <div class="card-body text-center" style="padding: 3rem 2rem;">
+                            <div class="success-animation mb-4">
+                                <i class="fas fa-check-circle text-success" style="font-size: 5rem; animation: bounceIn 0.8s ease-out;"></i>
+                            </div>
+
+                            <h2 class="mb-3" style="color: white; font-weight: 700;">Congratulations! 🎊</h2>
+                            <p class="lead mb-4" style="color: rgba(255,255,255,0.9); font-size: 1.2rem;">
+                                Your appointment has been scheduled successfully and payment is authorized!
+                            </p>
+
+                            <div class="celebration-icons mb-4" style="display: flex; justify-content: center; gap: 1rem; opacity: 0.8;">
+                                <i class="fas fa-star" style="font-size: 1.5rem; animation: float 3s ease-in-out infinite;"></i>
+                                <i class="fas fa-heart" style="font-size: 1.5rem; animation: float 3s ease-in-out infinite; animation-delay: 0.5s;"></i>
+                                <i class="fas fa-thumbs-up" style="font-size: 1.5rem; animation: float 3s ease-in-out infinite; animation-delay: 1s;"></i>
+                                <i class="fas fa-gem" style="font-size: 1.5rem; animation: float 3s ease-in-out infinite; animation-delay: 1.5s;"></i>
+                            </div>
+
+                            <div class="confirmation-details mb-4" style="background: rgba(255,255,255,0.1); border-radius: 15px; padding: 1.5rem; backdrop-filter: blur(10px);">
+                                <h6 class="mb-3" style="color: #4ade80;">
+                                    <i class="fas fa-shield-alt me-2"></i>Payment Status: Secure & Authorized
+                                </h6>
+                                <p class="mb-2" style="color: rgba(255,255,255,0.9);">
+                                    <i class="fas fa-lock me-2"></i>Your card details are encrypted and secure
+                                </p>
+                                <p class="mb-0" style="color: rgba(255,255,255,0.9);">
+                                    <i class="fas fa-credit-card me-2"></i>You'll only be charged after service completion
+                                </p>
+                            </div>
+
+                            <div class="next-steps mb-4" style="background: rgba(255,255,255,0.1); border-radius: 15px; padding: 1.5rem; backdrop-filter: blur(10px);">
+                                <h6 class="mb-3" style="color: #fbbf24;">
+                                    <i class="fas fa-list-check me-2"></i>What Happens Next?
+                                </h6>
+                                <div class="row text-start">
+                                    <div class="col-md-6">
+                                        <p class="mb-2" style="color: rgba(255,255,255,0.9); font-size: 0.9rem;">
+                                            <i class="fas fa-envelope me-2"></i>Confirmation email sent
+                                        </p>
+                                        <p class="mb-2" style="color: rgba(255,255,255,0.9); font-size: 0.9rem;">
+                                            <i class="fas fa-user-tie me-2"></i>Technician assignment
+                                        </p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p class="mb-2" style="color: rgba(255,255,255,0.9); font-size: 0.9rem;">
+                                            <i class="fas fa-sms me-2"></i>SMS notifications
+                                        </p>
+                                        <p class="mb-2" style="color: rgba(255,255,255,0.9); font-size: 0.9rem;">
+                                            <i class="fas fa-tools me-2"></i>Service delivery
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="action-buttons">
+                                <a href="{{ route('home') }}" class="btn btn-light btn-lg me-3" style="border-radius: 12px; padding: 0.75rem 2rem; font-weight: 600;">
                                     <i class="fas fa-home me-2"></i>Return Home
                                 </a>
+                                <button type="button" class="btn btn-outline-light btn-lg" style="border-radius: 12px; padding: 0.75rem 2rem; font-weight: 600;" onclick="window.print()">
+                                    <i class="fas fa-print me-2"></i>Print Receipt
+                                </button>
+                            </div>
+
+                            <div class="mt-4">
+                                <small style="color: rgba(255,255,255,0.7);">
+                                    <i class="fas fa-phone me-1"></i>
+                                    Need help? Call <strong>(555) 123-4567</strong>
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -298,11 +946,85 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+@endsection
+
+@push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
         let currentStep = 1;
+    const totalSteps = 4;
         let selectedTimeSlot = null;
+
+    // Enhanced step navigation with animations
+    function nextStep() {
+        if (currentStep < totalSteps) {
+            // Add slide-out animation to current section
+            const currentSection = document.getElementById(`section-${currentStep}`);
+            currentSection.classList.add('slide-out');
+
+            setTimeout(() => {
+                // Hide current section
+                currentSection.classList.remove('active', 'slide-out');
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+                document.getElementById(`step-${currentStep}`).classList.add('completed');
+
+                currentStep++;
+
+                // Show next section with animation
+                const nextSection = document.getElementById(`section-${currentStep}`);
+                nextSection.classList.add('active');
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+
+                // Update progress line with animation
+                updateProgressLine();
+
+                // Scroll to top of form
+                document.querySelector('.appointment-container').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }, 400);
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 1) {
+            // Add slide-out animation to current section
+            const currentSection = document.getElementById(`section-${currentStep}`);
+            currentSection.classList.add('slide-out');
+
+            setTimeout(() => {
+                // Hide current section
+                currentSection.classList.remove('active', 'slide-out');
+                document.getElementById(`step-${currentStep}`).classList.remove('active');
+
+                currentStep--;
+
+                // Show previous section with animation
+                const prevSection = document.getElementById(`section-${currentStep}`);
+                prevSection.classList.add('active');
+                document.getElementById(`step-${currentStep}`).classList.add('active');
+                document.getElementById(`step-${currentStep}`).classList.remove('completed');
+
+                // Update progress line
+                updateProgressLine();
+
+                // Scroll to top of form
+                document.querySelector('.appointment-container').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }, 400);
+        }
+    }
+
+    function updateProgressLine() {
+        const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+        const progressLine = document.querySelector('.step-indicator::after');
+        if (progressLine) {
+            progressLine.style.width = progress + '%';
+        }
+    }
 
         // Initialize date picker
         flatpickr("#appointment_date", {
@@ -385,19 +1107,18 @@
                         <strong>${data.service_type}</strong> - Estimated duration: <strong>${data.service_duration} minutes</strong>
                     </div>
                 </div>
-                ${slots.map(slot => `
-                    <div class="col-md-6 col-lg-4 mb-3">
-                        <div class="time-slot" data-datetime="${slot.datetime}" onclick="selectTimeSlot(this, '${slot.datetime}')">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <i class="fas fa-clock text-primary me-2"></i>
-                                    <strong>${slot.start_time} - ${slot.end_time}</strong>
+                ${slots.map((slot, index) => `
+                    <div class="time-slot"
+                         data-datetime="${slot.datetime}"
+                         onclick="selectTimeSlot(this, '${slot.datetime}')"
+                         style="animation-delay: ${index * 0.1}s">
+                        <div class="time-display">
+                            <i class="fas fa-clock me-2"></i>
+                            ${slot.start_time} - ${slot.end_time}
                                 </div>
-                                <span class="badge bg-success">Available</span>
-                            </div>
-                            <small class="text-muted d-block mt-1">
-                                <i class="fas fa-user-tie me-1"></i>${slot.technician_name}
-                            </small>
+                        <div class="technician-info">
+                            <i class="fas fa-user-tie"></i>
+                            <span title="${slot.technician_name}">${slot.technician_name}</span>
                         </div>
                     </div>
                 `).join('')}
@@ -540,5 +1261,4 @@
             document.getElementById('appointment-form').submit();
         }
     </script>
-</body>
-</html>
+@endpush

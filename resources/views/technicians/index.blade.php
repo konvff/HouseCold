@@ -87,7 +87,7 @@
                                             </td>
                                             <td>
                                                 <span class="badge bg-{{ $technician->status === 'active' ? 'success' : ($technician->status === 'inactive' ? 'secondary' : 'warning') }}">
-                                                    {{ ucfirst($technician->status) }}
+                                                    {{ $technician->status->label() }}
                                                 </span>
                                             </td>
                                             <td>

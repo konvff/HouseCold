@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServiceType;
+use App\Repositories\Contracts\ServiceTypeRepositoryInterface;
 use Illuminate\Http\Request;
 
 class ServiceTypeController extends Controller
 {
+    public function __construct(
+        private ServiceTypeRepositoryInterface $serviceTypeRepository
+    ) {}
     public function index()
     {
         $serviceTypes = ServiceType::orderBy('name')->paginate(15);
@@ -28,7 +32,7 @@ class ServiceTypeController extends Controller
             'is_active' => 'boolean'
         ]);
 
-        ServiceType::create($request->all());
+        $this->serviceTypeRepository->create($request->all());
 
         return redirect()->route('service-types.index')
             ->with('success', 'Service type created successfully!');

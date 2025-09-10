@@ -6,6 +6,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Enums\UserRole;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -44,6 +45,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'role' => UserRole::class,
     ];
 
     public function technician()
@@ -51,23 +53,23 @@ class User extends Authenticatable
         return $this->hasOne(Technician::class);
     }
 
-    public function isAdmin()
+    public function isAdmin(): bool
     {
-        return $this->role === 'admin';
+        return $this->role === UserRole::ADMIN;
     }
 
-    public function isTechnician()
+    public function isTechnician(): bool
     {
-        return $this->role === 'technician';
+        return $this->role === UserRole::TECHNICIAN;
     }
 
-    public function isCustomer()
+    public function isCustomer(): bool
     {
-        return $this->role === 'customer';
+        return $this->role === UserRole::CUSTOMER;
     }
 
-    public function hasRole($role)
+    public function hasRole(string $role): bool
     {
-        return $this->role === $role;
+        return $this->role->value === $role;
     }
 }

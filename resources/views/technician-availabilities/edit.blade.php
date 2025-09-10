@@ -190,7 +190,7 @@
                     <div class="row">
                         <div class="col-md-6">
                             <p><strong>Technician:</strong> {{ $availability->technician->user->name }}</p>
-                            <p><strong>Day:</strong> {{ ucfirst($availability->day_of_week) }}</p>
+                            <p><strong>Day:</strong> {{ $availability->day_of_week->label() }}</p>
                             <p><strong>Time:</strong> {{ $availability->start_time->format('g:i A') }} - {{ $availability->end_time->format('g:i A') }}</p>
                         </div>
                         <div class="col-md-6">

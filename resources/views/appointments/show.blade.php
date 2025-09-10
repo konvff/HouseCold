@@ -45,7 +45,7 @@
                             <label class="form-label fw-bold">Status</label>
                             <div>
                                 <span class="status-badge status-{{ $appointment->status }}">
-                                    {{ ucfirst($appointment->status) }}
+                                    {{ $appointment->status->label() }}
                                 </span>
                             </div>
                         </div>
@@ -146,7 +146,7 @@
                             <label class="form-label fw-bold">Status</label>
                             <p class="mb-0">
                                 <span class="badge bg-{{ $appointment->technician->status === 'active' ? 'success' : ($appointment->technician->status === 'inactive' ? 'secondary' : 'warning') }}">
-                                    {{ ucfirst($appointment->technician->status) }}
+                                    {{ $appointment->technician->status->label() }}
                                 </span>
                             </p>
                         </div>

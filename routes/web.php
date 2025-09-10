@@ -12,6 +12,7 @@ use App\Http\Controllers\ServiceTypeController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\TechnicianAvailabilityController;
+use App\Http\Controllers\SMSWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +36,11 @@ Route::get('/', function () {
 Route::get('/book-appointment', [AppointmentController::class, 'create'])->name('appointments.create');
 Route::post('/book-appointment', [AppointmentController::class, 'store'])->name('appointments.store');
 Route::get('/available-slots', [AppointmentController::class, 'availableSlots'])->name('appointments.available-slots');
+Route::get('/payment-confirmation/{appointment}', [AppointmentController::class, 'paymentConfirmation'])->name('payments.confirmation');
+
+// SMS Webhook routes (no authentication required)
+Route::post('/sms/webhook', [SMSWebhookController::class, 'handleIncomingSMS'])->name('sms.webhook');
+Route::post('/sms/delivery-status', [SMSWebhookController::class, 'handleDeliveryStatus'])->name('sms.delivery-status');
 
 Route::group(['middleware' => 'auth'], function () {
 
@@ -88,7 +94,9 @@ Route::group(['middleware' => 'auth'], function () {
         Route::resource('technicians', TechnicianController::class);
 
         // Technician Availability Management (Admin)
-        Route::resource('technician-availabilities', TechnicianAvailabilityController::class);
+        Route::resource('technician-availabilities', TechnicianAvailabilityController::class)->parameters([
+            'technician-availabilities' => 'availability'
+        ]);
 
 
 
@@ -105,8 +113,8 @@ Route::group(['middleware' => 'auth'], function () {
         // Technician's own availability management
         Route::get('my-availability', [TechnicianAvailabilityController::class, 'myAvailability'])->name('technician-availabilities.my-availability');
         Route::post('my-availability', [TechnicianAvailabilityController::class, 'storeMyAvailability'])->name('technician-availabilities.store-my');
-        Route::put('my-availability/{availability}', [TechnicianAvailabilityController::class, 'updateMyAvailability'])->name('technician-availabilities.update-my');
-        Route::delete('my-availability/{availability}', [TechnicianAvailabilityController::class, 'destroyMyAvailability'])->name('technician-availabilities.destroy-my');
+        Route::put('my-availability/{technician_availability}', [TechnicianAvailabilityController::class, 'updateMyAvailability'])->name('technician-availabilities.update-my');
+        Route::delete('my-availability/{technician_availability}', [TechnicianAvailabilityController::class, 'destroyMyAvailability'])->name('technician-availabilities.destroy-my');
 
         Route::post('/appointments/{appointment}/accept', [TechnicianController::class, 'acceptAppointment'])->name('appointments.accept');
         Route::post('/appointments/{appointment}/decline', [TechnicianController::class, 'declineAppointment'])->name('appointments.decline');

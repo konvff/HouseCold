@@ -7,6 +7,7 @@
         <button class="btn-close btn-close-white" id="sidebarClose"></button>
     </div>
 
+    @auth
     <div class="sidebar-user">
         <div class="d-flex align-items-center">
             <div class="avatar">
@@ -14,12 +15,14 @@
             </div>
             <div class="user-info">
                 <h6 class="mb-0 text-white">{{ Auth::user()->name }}</h6>
-                <small class="text-light">{{ ucfirst(Auth::user()->role) }}</small>
+                <small class="text-light">{{ Auth::user()->role->label() }}</small>
             </div>
         </div>
     </div>
+    @endauth
 
     <nav class="sidebar-nav">
+        @auth
         @if(Auth::user()->isAdmin())
             {{-- Admin Navigation --}}
             <div class="nav-section">
@@ -164,6 +167,7 @@
                 </li>
             </ul>
         </div>
+        @endauth
     </nav>
 
     <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">

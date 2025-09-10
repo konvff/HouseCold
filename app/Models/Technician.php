@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\TechnicianStatus;
 
 class Technician extends Model
 {
@@ -19,7 +20,8 @@ class Technician extends Model
 
     protected $casts = [
         'hourly_rate' => 'decimal:2',
-        'specialties' => 'array'
+        'specialties' => 'array',
+        'status' => TechnicianStatus::class,
     ];
 
     public function user()

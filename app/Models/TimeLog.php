@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\TimeLogStatus;
 
 class TimeLog extends Model
 {
@@ -21,7 +22,8 @@ class TimeLog extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
-        'duration_minutes' => 'integer'
+        'duration_minutes' => 'integer',
+        'status' => TimeLogStatus::class,
     ];
 
     public function appointment()

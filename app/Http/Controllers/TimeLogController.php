@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Models\TimeLog;
 use App\Models\Appointment;
+use App\Repositories\Contracts\AppointmentRepositoryInterface;
+use App\Services\Contracts\TimeLogServiceInterface;
+use App\Enums\AppointmentStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class TimeLogController extends Controller
 {
+    public function __construct(
+        private AppointmentRepositoryInterface $appointmentRepository,
+        private TimeLogServiceInterface $timeLogService
+    ) {}
     public function index()
     {
         $timeLogs = TimeLog::with(['appointment', 'technician'])
@@ -25,39 +32,33 @@ class TimeLogController extends Controller
             'notes' => 'nullable|string'
         ]);
 
-        $appointment = Appointment::findOrFail($request->appointment_id);
-        $technician = Auth::user()->technician;
+        $appointment = $this->appointmentRepository->find($request->appointment_id);
+        if (!$appointment) {
+            return response()->json(['error' => 'Appointment not found'], 404);
+        }
 
+        $technician = Auth::user()->technician;
         if (!$technician || $appointment->technician_id !== $technician->id) {
             return response()->json(['error' => 'Access denied'], 403);
         }
 
-        if ($appointment->status !== 'confirmed') {
+        if ($appointment->status !== AppointmentStatus::CONFIRMED->value) {
             return response()->json(['error' => 'Appointment must be confirmed to start timer'], 400);
         }
 
-        // Check if timer is already running
-        $existingTimer = $appointment->getCurrentTimeLog();
-        if ($existingTimer) {
-            return response()->json(['error' => 'Timer is already running for this appointment'], 400);
+        try {
+            $timeLog = $this->timeLogService->startTimer($appointment);
+            $this->appointmentRepository->update($appointment->id, ['status' => AppointmentStatus::IN_PROGRESS->value]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Timer started successfully',
+                'time_log_id' => $timeLog->id,
+                'started_at' => $timeLog->started_at
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
         }
-
-        // Start timer
-        $timeLog = TimeLog::create([
-            'appointment_id' => $appointment->id,
-            'technician_id' => $technician->id,
-            'started_at' => now(),
-            'notes' => $request->notes
-        ]);
-
-        $appointment->update(['status' => 'in_progress']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Timer started successfully',
-            'time_log_id' => $timeLog->id,
-            'started_at' => $timeLog->started_at
-        ]);
     }
 
     public function stopTimer(Request $request)

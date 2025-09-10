@@ -3,16 +3,28 @@
 namespace App\Http\Controllers;
 
 use App\Models\Technician;
-use App\Models\TechnicianAvailability;
 use App\Models\Appointment;
 use App\Models\ServiceType;
-use App\Models\User;
+use App\Models\TechnicianAvailability;
+use App\Repositories\Contracts\TechnicianRepositoryInterface;
+use App\Repositories\Contracts\ServiceTypeRepositoryInterface;
+use App\Repositories\Contracts\UserRepositoryInterface;
+use App\Services\Contracts\TechnicianServiceInterface;
+use App\Services\Contracts\UserServiceInterface;
+use App\Enums\TechnicianStatus;
+use App\Enums\UserRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\CardknoxPaymentService;
 
 class TechnicianController extends Controller
 {
+    public function __construct(
+        private TechnicianRepositoryInterface $technicianRepository,
+        private ServiceTypeRepositoryInterface $serviceTypeRepository,
+        private UserRepositoryInterface $userRepository,
+        private TechnicianServiceInterface $technicianService,
+        private UserServiceInterface $userService
+    ) {}
     public function index()
     {
         $technicians = Technician::with(['user', 'availabilities', 'serviceTypes'])
@@ -24,7 +36,7 @@ class TechnicianController extends Controller
 
     public function create()
     {
-        $serviceTypes = ServiceType::where('is_active', true)->get();
+        $serviceTypes = $this->serviceTypeRepository->getActiveServiceTypes();
         return view('technicians.create', compact('serviceTypes'));
     }
 
@@ -41,23 +53,20 @@ class TechnicianController extends Controller
             'service_types' => 'nullable|array'
         ]);
 
-        // Create user first
-        $user = User::create([
+        $user = $this->userService->createUser([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt($request->password),
-            'role' => 'technician'
+            'password' => $request->password,
+            'role' => UserRole::TECHNICIAN->value
         ]);
 
-        // Process specialties - convert comma-separated string to array
         $specialties = null;
         if ($request->specialties) {
             $specialties = array_map('trim', explode(',', $request->specialties));
-            $specialties = array_filter($specialties); // Remove empty values
+            $specialties = array_filter($specialties);
         }
 
-        // Create technician
-        $technician = Technician::create([
+        $technician = $this->technicianService->createTechnician([
             'user_id' => $user->id,
             'phone' => $request->phone,
             'specialties' => $specialties,
@@ -65,7 +74,6 @@ class TechnicianController extends Controller
             'status' => $request->status
         ]);
 
-        // Attach service types if provided
         if ($request->service_types) {
             $technician->serviceTypes()->attach($request->service_types);
         }
@@ -467,7 +475,7 @@ class TechnicianController extends Controller
             ->orderBy('scheduled_at', 'asc')
             ->get();
 
-        $serviceTypes = \App\Models\ServiceType::where('is_active', true)->get();
+        $serviceTypes = ServiceType::where('is_active', true)->get();
 
         // Counts for sidebar
         $pendingCount = Appointment::where('status', 'pending')
@@ -502,7 +510,7 @@ class TechnicianController extends Controller
             ->orderBy('scheduled_at', 'asc')
             ->get();
 
-        $serviceTypes = \App\Models\ServiceType::where('is_active', true)->get();
+        $serviceTypes = ServiceType::where('is_active', true)->get();
 
         // Counts for sidebar
         $pendingCount = Appointment::where('status', 'pending')
@@ -538,7 +546,7 @@ class TechnicianController extends Controller
             ->limit(50)
             ->get();
 
-        $serviceTypes = \App\Models\ServiceType::where('is_active', true)->get();
+        $serviceTypes = ServiceType::where('is_active', true)->get();
 
         // Calculate summary stats
         $totalEarnings = $completedAppointments->sum('actual_cost');
@@ -581,7 +589,7 @@ class TechnicianController extends Controller
             return redirect()->route('home')->withErrors(['error' => 'Access denied. Technician account required.']);
         }
 
-        $serviceTypes = \App\Models\ServiceType::where('is_active', true)->get();
+        $serviceTypes = ServiceType::where('is_active', true)->get();
 
         // Counts for sidebar
         $pendingCount = Appointment::where('status', 'pending')

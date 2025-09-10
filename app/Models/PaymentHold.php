@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\PaymentStatus;
 
 class PaymentHold extends Model
 {
@@ -24,7 +25,8 @@ class PaymentHold extends Model
     protected $casts = [
         'amount' => 'decimal:2',
         'expires_at' => 'datetime',
-        'captured_at' => 'datetime'
+        'captured_at' => 'datetime',
+        'status' => PaymentStatus::class,
     ];
 
     public function appointment()

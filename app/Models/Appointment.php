@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Enums\AppointmentStatus;
 
 class Appointment extends Model
 {
@@ -28,7 +29,8 @@ class Appointment extends Model
         'scheduled_at' => 'datetime',
         'estimated_duration_minutes' => 'integer',
         'estimated_cost' => 'decimal:2',
-        'actual_cost' => 'decimal:2'
+        'actual_cost' => 'decimal:2',
+        'status' => AppointmentStatus::class
     ];
 
     public function serviceType()
@@ -55,4 +57,10 @@ class Appointment extends Model
     {
         return $this->timeLogs()->whereNull('ended_at')->first();
     }
+
+    public function smsNotifications()
+    {
+        return $this->hasMany(SMSNotification::class);
+    }
+
 }

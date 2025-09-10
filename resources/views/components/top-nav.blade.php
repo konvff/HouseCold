@@ -50,7 +50,7 @@
                     <i class="fas fa-user-circle fa-lg text-primary"></i>
                 </div>
                 <div class="user-info d-none d-md-block">
-                    <small class="text-muted d-block">{{ ucfirst(Auth::user()->role) }}</small>
+                    <small class="text-muted d-block">{{ Auth::user()->role->label() }}</small>
                     <strong>{{ Auth::user()->name }}</strong>
                 </div>
                 <i class="fas fa-chevron-down ms-2"></i>

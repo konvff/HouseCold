@@ -209,7 +209,7 @@
                         <small class="text-muted">Status</small>
                         <div>
                             <span class="badge bg-{{ $appointment->paymentHold->status == 'authorized' ? 'warning' : ($appointment->paymentHold->status == 'captured' ? 'success' : 'secondary') }}">
-                                {{ ucfirst($appointment->paymentHold->status) }}
+                                {{ $appointment->paymentHold->status->label() }}
                             </span>
                         </div>
                     </div>

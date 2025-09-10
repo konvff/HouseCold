@@ -54,7 +54,7 @@
                                     @foreach($availabilities as $availability)
                                         <tr>
                                             <td>
-                                                <span class="badge bg-primary">{{ ucfirst($availability->day_of_week) }}</span>
+                                                <span class="badge bg-primary">{{ $availability->day_of_week->label() }}</span>
                                             </td>
                                             <td>
                                                 <div>

@@ -4,12 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\TechnicianAvailability;
 use App\Models\Technician;
+use App\Repositories\Contracts\TechnicianAvailabilityRepositoryInterface;
+use App\Repositories\Contracts\TechnicianRepositoryInterface;
+use App\Services\Contracts\TechnicianAvailabilityServiceInterface;
+use App\Enums\DayOfWeek;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class TechnicianAvailabilityController extends Controller
 {
+    public function __construct(
+        private TechnicianAvailabilityRepositoryInterface $availabilityRepository,
+        private TechnicianRepositoryInterface $technicianRepository,
+        private TechnicianAvailabilityServiceInterface $availabilityService
+    ) {}
 
 
     public function index()
@@ -20,101 +29,54 @@ class TechnicianAvailabilityController extends Controller
             ->orderBy('start_time')
             ->get();
 
-        $technicians = Technician::with('user')->get();
+        $technicians = $this->technicianRepository->getActiveTechnicians();
 
         return view('technician-availabilities.index', compact('availabilities', 'technicians'));
     }
 
     public function create()
     {
-        $technicians = Technician::with('user')->get();
-        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $technicians = $this->technicianRepository->getActiveTechnicians();
+        $daysOfWeek = DayOfWeek::getAllDays();
 
         return view('technician-availabilities.create', compact('technicians', 'daysOfWeek'));
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'technician_id' => 'required|exists:technicians,id',
-            'day_of_week' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'start_date' => 'nullable|date|after_or_equal:today',
-            'end_date' => 'nullable|date|after:start_date',
-            'is_recurring' => 'boolean',
-            'is_active' => 'boolean'
-        ]);
+        try {
+            $this->availabilityService->createAvailability($request->all());
 
-        // Check for overlapping availability
-        $overlapping = TechnicianAvailability::where('technician_id', $request->technician_id)
-            ->where('day_of_week', $request->day_of_week)
-            ->where('is_active', true)
-            ->where(function($query) use ($request) {
-                $query->where(function($q) use ($request) {
-                    $q->where('start_time', '<', $request->end_time)
-                      ->where('end_time', '>', $request->start_time);
-                });
-            })
-            ->exists();
-
-        if ($overlapping) {
-            return back()->withErrors(['error' => 'This time slot overlaps with existing availability for this technician.']);
+            return redirect()->route('technician-availabilities.index')
+                ->with('success', 'Availability time slot created successfully!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
-
-        TechnicianAvailability::create($request->all());
-
-        return redirect()->route('technician-availabilities.index')
-            ->with('success', 'Availability time slot created successfully!');
     }
 
     public function edit(TechnicianAvailability $availability)
     {
-        $technicians = Technician::with('user')->get();
-        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $technicians = $this->technicianRepository->getActiveTechnicians();
+        $daysOfWeek = DayOfWeek::getAllDays();
 
         return view('technician-availabilities.edit', compact('availability', 'technicians', 'daysOfWeek'));
     }
 
     public function update(Request $request, TechnicianAvailability $availability)
     {
-        $request->validate([
-            'technician_id' => 'required|exists:technicians,id',
-            'day_of_week' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'start_date' => 'nullable|date|after_or_equal:today',
-            'end_date' => 'nullable|date|after:start_date',
-            'is_recurring' => 'boolean',
-            'is_active' => 'boolean'
-        ]);
+        try {
+            $this->availabilityService->updateAvailability($availability->id, $request->all());
 
-        // Check for overlapping availability (excluding current record)
-        $overlapping = TechnicianAvailability::where('technician_id', $request->technician_id)
-            ->where('day_of_week', $request->day_of_week)
-            ->where('is_active', true)
-            ->where('id', '!=', $availability->id)
-            ->where(function($query) use ($request) {
-                $query->where(function($q) use ($request) {
-                    $q->where('start_time', '<', $request->end_time)
-                      ->where('end_time', '>', $request->start_time);
-                });
-            })
-            ->exists();
-
-        if ($overlapping) {
-            return back()->withErrors(['error' => 'This time slot overlaps with existing availability for this technician.']);
+            return redirect()->route('technician-availabilities.index')
+                ->with('success', 'Availability time slot updated successfully!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
-
-        $availability->update($request->all());
-
-        return redirect()->route('technician-availabilities.index')
-            ->with('success', 'Availability time slot updated successfully!');
     }
 
     public function destroy(TechnicianAvailability $availability)
     {
-        $availability->delete();
+        $this->availabilityService->deleteAvailability($availability->id);
 
         return redirect()->route('technician-availabilities.index')
             ->with('success', 'Availability time slot removed successfully!');
@@ -129,12 +91,8 @@ class TechnicianAvailabilityController extends Controller
             return redirect()->route('home')->withErrors(['error' => 'Access denied. Technician account required.']);
         }
 
-        $availabilities = TechnicianAvailability::where('technician_id', $technician->id)
-            ->orderBy('day_of_week')
-            ->orderBy('start_time')
-            ->get();
-
-        $daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $availabilities = $this->availabilityService->getTechnicianAvailabilities($technician->id);
+        $daysOfWeek = DayOfWeek::getAllDays();
 
         return view('technician-availabilities.my-availability', compact('availabilities', 'daysOfWeek'));
     }
@@ -147,89 +105,44 @@ class TechnicianAvailabilityController extends Controller
             return back()->withErrors(['error' => 'Access denied.']);
         }
 
-        $request->validate([
-            'day_of_week' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'start_date' => 'nullable|date|after_or_equal:today',
-            'end_date' => 'nullable|date|after:start_date',
-            'is_recurring' => 'boolean',
-            'is_active' => 'boolean'
-        ]);
+        try {
+            $request->merge(['technician_id' => $technician->id]);
+            $this->availabilityService->createAvailability($request->all());
 
-        // Check for overlapping availability
-        $overlapping = TechnicianAvailability::where('technician_id', $technician->id)
-            ->where('day_of_week', $request->day_of_week)
-            ->where('is_active', true)
-            ->where(function($query) use ($request) {
-                $query->where(function($q) use ($request) {
-                    $q->where('start_time', '<', $request->end_time)
-                      ->where('end_time', '>', $request->start_time);
-                });
-            })
-            ->exists();
-
-        if ($overlapping) {
-            return back()->withErrors(['error' => 'This time slot overlaps with existing availability.']);
+            return redirect()->route('technician-availabilities.my-availability')
+                ->with('success', 'Availability time slot added successfully!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
-
-        $request->merge(['technician_id' => $technician->id]);
-        TechnicianAvailability::create($request->all());
-
-        return redirect()->route('technician-availabilities.my-availability')
-            ->with('success', 'Availability time slot added successfully!');
     }
 
-    public function updateMyAvailability(Request $request, TechnicianAvailability $availability)
+    public function updateMyAvailability(Request $request, TechnicianAvailability $technician_availability)
     {
         $technician = Auth::user()->technician;
 
-        if (!$technician || $availability->technician_id !== $technician->id) {
+        if (!$technician || $technician_availability->technician_id !== $technician->id) {
             return back()->withErrors(['error' => 'Access denied.']);
         }
 
-        $request->validate([
-            'day_of_week' => 'required|in:monday,tuesday,wednesday,thursday,friday,saturday,sunday',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i|after:start_time',
-            'start_date' => 'nullable|date|after_or_equal:today',
-            'end_date' => 'nullable|date|after:start_date',
-            'is_recurring' => 'boolean',
-            'is_active' => 'boolean'
-        ]);
+        try {
+            $this->availabilityService->updateAvailability($technician_availability->id, $request->all());
 
-        // Check for overlapping availability (excluding current record)
-        $overlapping = TechnicianAvailability::where('technician_id', $technician->id)
-            ->where('day_of_week', $request->day_of_week)
-            ->where('is_active', true)
-            ->where('id', '!=', $availability->id)
-            ->where(function($query) use ($request) {
-                $query->where(function($q) use ($request) {
-                    $q->where('start_time', '<', $request->end_time)
-                      ->where('end_time', '>', $request->start_time);
-                });
-            })
-            ->exists();
-
-        if ($overlapping) {
-            return back()->withErrors(['error' => 'This time slot overlaps with existing availability.']);
+            return redirect()->route('technician-availabilities.my-availability')
+                ->with('success', 'Availability time slot updated successfully!');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => $e->getMessage()]);
         }
-
-        $availability->update($request->all());
-
-        return redirect()->route('technician-availabilities.my-availability')
-            ->with('success', 'Availability time slot updated successfully!');
     }
 
-    public function destroyMyAvailability(TechnicianAvailability $availability)
+    public function destroyMyAvailability(TechnicianAvailability $technician_availability)
     {
         $technician = Auth::user()->technician;
 
-        if (!$technician || $availability->technician_id !== $technician->id) {
+        if (!$technician || $technician_availability->technician_id !== $technician->id) {
             return back()->withErrors(['error' => 'Access denied.']);
         }
 
-        $availability->delete();
+        $this->availabilityService->deleteAvailability($technician_availability->id);
 
         return redirect()->route('technician-availabilities.my-availability')
             ->with('success', 'Availability time slot removed successfully!');

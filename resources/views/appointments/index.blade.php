@@ -139,7 +139,7 @@
                                             </td>
                                             <td>
                                                 <span class="status-badge status-{{ $appointment->status }}">
-                                                    {{ ucfirst($appointment->status) }}
+                                                    {{ $appointment->status->label() }}
                                                 </span>
                                             </td>
                                             <td>
