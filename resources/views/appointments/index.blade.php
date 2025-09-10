@@ -163,7 +163,7 @@
                                                        title="Edit">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
-                                                    @if(!$appointment->technician && $appointment->status === 'pending')
+                                                    @if(!$appointment->technician && $appointment->status->value === 'pending')
                                                         <button class="btn btn-outline-info btn-sm"
                                                                 data-bs-toggle="modal"
                                                                 data-bs-target="#assignModal{{ $appointment->id }}"
@@ -265,8 +265,8 @@
 </div>
 
 <!-- Assign Technician Modals -->
-@foreach($appointments->where('status', 'pending') as $appointment)
-    @if(!$appointment->technician)
+@foreach($appointments as $appointment)
+    @if(!$appointment->technician && $appointment->status->value === 'pending')
         <div class="modal fade" id="assignModal{{ $appointment->id }}" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -285,13 +285,18 @@
                                 <label for="technician_id" class="form-label">Select Technician</label>
                                 <select class="form-select" name="technician_id" id="technician_id" required>
                                     <option value="">Choose a technician...</option>
+                                    @php $hasMatchingTechnicians = false; @endphp
                                     @foreach($technicians ?? [] as $technician)
-                                        @if($technician->status === 'active' && $technician->serviceTypes->contains($appointment->serviceType->id))
+                                        @if($technician->status->value === 'active' && $technician->serviceTypes->contains($appointment->serviceType->id))
+                                            @php $hasMatchingTechnicians = true; @endphp
                                             <option value="{{ $technician->id }}">
                                                 {{ $technician->user->name }} - {{ $technician->phone }}
                                             </option>
                                         @endif
                                     @endforeach
+                                    @if(!$hasMatchingTechnicians)
+                                        <option value="" disabled>No technicians available for this service type</option>
+                                    @endif
                                 </select>
                             </div>
                         </div>

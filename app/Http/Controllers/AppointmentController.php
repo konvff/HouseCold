@@ -36,7 +36,7 @@ class AppointmentController extends Controller
             ->paginate(15);
 
         $serviceTypes = $this->serviceTypeRepository->getActiveServiceTypes();
-        $technicians = $this->technicianRepository->getActiveTechnicians();
+        $technicians = $this->technicianRepository->getActiveTechnicians()->load(['user', 'serviceTypes']);
 
         return view('appointments.index', compact('appointments', 'serviceTypes', 'technicians'));
     }
