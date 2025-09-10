@@ -11,8 +11,9 @@ class ResetController extends Controller
     public function create()
     {
         return view('session/reset-password/sendEmail');
-        
+
     }
+
 
     public function sendEmail(Request $request)
     {
