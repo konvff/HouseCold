@@ -414,7 +414,7 @@ class SMSService implements SMSServiceInterface
     private function sendCancellationNotification(Appointment $appointment, Technician $technician): void
     {
         $message = "Appointment #{$appointment->id} has been cancelled by the customer. Thank you for your availability.";
-        
+
         try {
             $this->twilioClient->messages->create(
                 $technician->phone,
@@ -446,7 +446,7 @@ class SMSService implements SMSServiceInterface
     private function sendDeclineNotification(Appointment $appointment, Technician $technician): void
     {
         $message = "Technician {$technician->user->name} has declined appointment #{$appointment->id}. We'll find another technician for you.";
-        
+
         try {
             $this->twilioClient->messages->create(
                 $appointment->customer_phone,
@@ -479,12 +479,12 @@ class SMSService implements SMSServiceInterface
     {
         // Remove all non-numeric characters
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        
+
         // Add +1 if it's a 10-digit US number
         if (strlen($phone) === 10) {
             $phone = '+1' . $phone;
         }
-        
+
         return $phone;
     }
 }

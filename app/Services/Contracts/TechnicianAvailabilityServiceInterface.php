@@ -11,7 +11,7 @@ interface TechnicianAvailabilityServiceInterface
     public function updateAvailability(int $id, array $data): bool;
     public function deleteAvailability(int $id): bool;
     public function checkOverlappingAvailability(int $technicianId, string $dayOfWeek, string $startTime, string $endTime, ?int $excludeId = null): bool;
-    public function getTechnicianAvailabilities(int $technicianId): array;
-    public function getAvailableTechniciansForDay(string $dayOfWeek): array;
+    public function getTechnicianAvailabilities(int $technicianId): \Illuminate\Database\Eloquent\Collection;
+    public function getAvailableTechniciansForDay(string $dayOfWeek): \Illuminate\Database\Eloquent\Collection;
     public function validateAvailabilityData(array $data): array;
 }

@@ -56,7 +56,7 @@ Route::get('/test-sms', function () {
             config('services.twilio.sid'),
             config('services.twilio.token')
         );
-        
+
         $message = $twilioClient->messages->create(
             '+17325958731', // The number you want to test
             [
@@ -64,14 +64,14 @@ Route::get('/test-sms', function () {
                 'body' => 'Hello! This is a test message from your Laravel SMS system. Reply with YES to test the webhook functionality.'
             ]
         );
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Test SMS sent successfully!',
             'twilio_sid' => $message->sid,
             'to' => '+17325958731'
         ]);
-        
+
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,

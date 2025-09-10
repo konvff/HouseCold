@@ -72,19 +72,18 @@ class TechnicianAvailabilityService implements TechnicianAvailabilityServiceInte
         return $query->exists();
     }
 
-    public function getTechnicianAvailabilities(int $technicianId): array
+    public function getTechnicianAvailabilities(int $technicianId): \Illuminate\Database\Eloquent\Collection
     {
-        return $this->availabilityRepository->getByTechnicianId($technicianId)->toArray();
+        return $this->availabilityRepository->getByTechnicianId($technicianId);
     }
 
-    public function getAvailableTechniciansForDay(string $dayOfWeek): array
+    public function getAvailableTechniciansForDay(string $dayOfWeek): \Illuminate\Database\Eloquent\Collection
     {
         $availabilities = $this->availabilityRepository->getByDayOfWeek($dayOfWeek);
         $technicianIds = $availabilities->pluck('technician_id')->unique();
 
         return $this->technicianRepository->getActiveTechnicians()
-            ->whereIn('id', $technicianIds)
-            ->toArray();
+            ->whereIn('id', $technicianIds);
     }
 
     public function validateAvailabilityData(array $data): array

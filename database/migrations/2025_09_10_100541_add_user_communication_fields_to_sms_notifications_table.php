@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->nullable()->after('technician_id');
             $table->string('phone_number')->nullable()->after('message');
             $table->enum('direction', ['inbound', 'outbound'])->default('outbound')->after('phone_number');
-            
+
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
             $table->index(['user_id', 'technician_id']);
             $table->index(['appointment_id', 'type']);
