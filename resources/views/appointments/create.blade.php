@@ -701,7 +701,17 @@
                             </div>
                             <div class="mb-3">
                                 <label for="customer_address" class="form-label">Service Address *</label>
-                                <textarea class="form-control" id="customer_address" name="customer_address" rows="3" required>{{ $user?->location ?? '' }}</textarea>
+                                <input type="text" class="form-control" id="customer_address" name="customer_address"
+                                       placeholder="Start typing your address..." required
+                                       value="{{ $user?->location ?? '' }}">
+                                <small class="form-text text-muted">
+                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                    Type your address and select from the suggestions, or click on the map to set your location.
+                                </small>
+                                <div id="map" style="height: 300px; width: 100%; margin-top: 10px; border-radius: 8px; border: 1px solid #e9ecef;"></div>
+                                <input type="hidden" id="address_lat" name="address_lat">
+                                <input type="hidden" id="address_lng" name="address_lng">
+                                <input type="hidden" id="address_components" name="address_components">
                             </div>
                             @if($isGuest)
                             <div class="mb-3">
@@ -1228,5 +1238,226 @@
             // Submit the form
             document.getElementById('appointment-form').submit();
         }
+
+        // Google Maps Integration
+        let map;
+        let marker;
+        let autocomplete;
+        let geocoder;
+
+        function initGoogleMaps() {
+            const apiKey = '{{ config("services.google_maps.api_key") }}';
+
+            console.log('Google Maps API Key:', apiKey ? 'Present' : 'Missing');
+
+            if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
+                console.log('No valid API key found, using fallback mode');
+                // Fallback: Hide map and show manual input
+                document.getElementById('map').style.display = 'none';
+                document.querySelector('small.form-text').innerHTML =
+                    '<i class="fas fa-info-circle me-1"></i>Please enter your full address manually.';
+                return;
+            }
+
+            // Check if Google Maps is already loaded
+            if (window.google && window.google.maps) {
+                console.log('Google Maps already loaded, initializing directly');
+                initMap();
+                return;
+            }
+
+            // Load Google Maps API with marker library
+            console.log('Loading Google Maps API...');
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = function() {
+                console.error('Failed to load Google Maps API script');
+                document.getElementById('map').style.display = 'none';
+                document.querySelector('small.form-text').innerHTML =
+                    '<i class="fas fa-exclamation-triangle me-1"></i>Google Maps failed to load. Please enter your address manually.';
+            };
+            document.head.appendChild(script);
+        }
+
+        function initMap() {
+            try {
+                console.log('Initializing Google Maps...');
+
+                // Check if Google Maps is available
+                if (!window.google || !window.google.maps) {
+                    throw new Error('Google Maps API not loaded');
+                }
+
+                // Initialize map
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: 40.7128, lng: -74.0060 }, // Default to NYC
+                    zoom: 13,
+                    mapTypeControl: false,
+                    streetViewControl: false,
+                    fullscreenControl: false
+                });
+
+                console.log('Google Maps initialized successfully');
+            } catch (error) {
+                console.error('Error initializing Google Maps:', error);
+                document.getElementById('map').style.display = 'none';
+                document.querySelector('small.form-text').innerHTML =
+                    '<i class="fas fa-exclamation-triangle me-1"></i>Error loading Google Maps: ' + error.message + '. Please enter your address manually.';
+                return;
+            }
+
+            // Initialize geocoder
+            geocoder = new google.maps.Geocoder();
+
+            // Initialize autocomplete
+            const addressInput = document.getElementById('customer_address');
+            autocomplete = new google.maps.places.Autocomplete(addressInput, {
+                types: ['address'],
+                componentRestrictions: { country: 'us' } // Restrict to US addresses
+            });
+
+            // Handle autocomplete selection
+            autocomplete.addListener('place_changed', function() {
+                const place = autocomplete.getPlace();
+                if (place.geometry) {
+                    const location = place.geometry.location;
+                    map.setCenter(location);
+                    map.setZoom(16);
+
+                    // Update marker using AdvancedMarkerElement or fallback to Marker
+                    if (marker) {
+                        if (marker.map) {
+                            marker.map = null;
+                        } else {
+                            marker.setMap(null);
+                        }
+                    }
+
+                    try {
+                        // Try AdvancedMarkerElement first
+                        if (window.google && window.google.maps && window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+                            marker = new google.maps.marker.AdvancedMarkerElement({
+                                position: location,
+                                map: map,
+                                title: place.formatted_address
+                            });
+                        } else {
+                            // Fallback to regular Marker
+                            marker = new google.maps.Marker({
+                                position: location,
+                                map: map,
+                                title: place.formatted_address
+                            });
+                        }
+                    } catch (error) {
+                        console.warn('Error creating marker:', error);
+                        // Fallback to regular Marker
+                        marker = new google.maps.Marker({
+                            position: location,
+                            map: map,
+                            title: place.formatted_address
+                        });
+                    }
+
+                    // Update hidden fields
+                    document.getElementById('address_lat').value = location.lat();
+                    document.getElementById('address_lng').value = location.lng();
+                    document.getElementById('address_components').value = JSON.stringify(place.address_components);
+                }
+            });
+
+            // Handle map clicks
+            map.addListener('click', function(event) {
+                const location = event.latLng;
+
+                // Update marker using AdvancedMarkerElement or fallback to Marker
+                if (marker) {
+                    if (marker.map) {
+                        marker.map = null;
+                    } else {
+                        marker.setMap(null);
+                    }
+                }
+
+                try {
+                    // Try AdvancedMarkerElement first
+                    if (window.google && window.google.maps && window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+                        marker = new google.maps.marker.AdvancedMarkerElement({
+                            position: location,
+                            map: map
+                        });
+                    } else {
+                        // Fallback to regular Marker
+                        marker = new google.maps.Marker({
+                            position: location,
+                            map: map
+                        });
+                    }
+                } catch (error) {
+                    console.warn('Error creating marker:', error);
+                    // Fallback to regular Marker
+                    marker = new google.maps.Marker({
+                        position: location,
+                        map: map
+                    });
+                }
+
+                // Reverse geocode to get address
+                geocoder.geocode({ location: location }, function(results, status) {
+                    if (status === 'OK' && results[0]) {
+                        const address = results[0].formatted_address;
+                        document.getElementById('customer_address').value = address;
+                        document.getElementById('address_lat').value = location.lat();
+                        document.getElementById('address_lng').value = location.lng();
+                        document.getElementById('address_components').value = JSON.stringify(results[0].address_components);
+                    }
+                });
+            });
+
+            // Try to geocode existing address if any
+            const existingAddress = addressInput.value;
+            if (existingAddress) {
+                geocoder.geocode({ address: existingAddress }, function(results, status) {
+                    if (status === 'OK' && results[0]) {
+                        const location = results[0].geometry.location;
+                        map.setCenter(location);
+                        map.setZoom(16);
+
+                        try {
+                            // Try AdvancedMarkerElement first
+                            if (window.google && window.google.maps && window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+                                marker = new google.maps.marker.AdvancedMarkerElement({
+                                    position: location,
+                                    map: map,
+                                    title: existingAddress
+                                });
+                            } else {
+                                // Fallback to regular Marker
+                                marker = new google.maps.Marker({
+                                    position: location,
+                                    map: map,
+                                    title: existingAddress
+                                });
+                            }
+                        } catch (error) {
+                            console.warn('Error creating marker:', error);
+                            // Fallback to regular Marker
+                            marker = new google.maps.Marker({
+                                position: location,
+                                map: map,
+                                title: existingAddress
+                            });
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initialize Google Maps when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initGoogleMaps();
+        });
     </script>
 @endpush

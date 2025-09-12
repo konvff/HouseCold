@@ -75,8 +75,18 @@
 
                         <div class="mb-3">
                             <label for="customer_address" class="form-label">Customer Address *</label>
-                            <textarea class="form-control @error('customer_address') is-invalid @enderror"
-                                      id="customer_address" name="customer_address" rows="3" required>{{ $appointment->customer_address ?? '' }}</textarea>
+                            <input type="text" class="form-control @error('customer_address') is-invalid @enderror"
+                                   id="customer_address" name="customer_address"
+                                   placeholder="Start typing your address..." required
+                                   value="{{ $appointment->customer_address ?? '' }}">
+                            <small class="form-text text-muted">
+                                <i class="fas fa-map-marker-alt me-1"></i>
+                                Type your address and select from the suggestions, or click on the map to set your location.
+                            </small>
+                            <div id="map" style="height: 300px; width: 100%; margin-top: 10px; border-radius: 8px; border: 1px solid #e9ecef;"></div>
+                            <input type="hidden" id="address_lat" name="address_lat" value="{{ $appointment->address_lat ?? '' }}">
+                            <input type="hidden" id="address_lng" name="address_lng" value="{{ $appointment->address_lng ?? '' }}">
+                            <input type="hidden" id="address_components" name="address_components" value="{{ $appointment->address_components ? json_encode($appointment->address_components) : '' }}">
                             @error('customer_address')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -365,6 +375,144 @@ function cancelAppointment() {
 // Auto-update technician in main form when assigned via modal
 document.getElementById('modal_technician_id').addEventListener('change', function() {
     document.getElementById('technician_id').value = this.value;
+});
+
+// Google Maps Integration
+let map;
+let marker;
+let autocomplete;
+let geocoder;
+
+function initGoogleMaps() {
+    const apiKey = '{{ config("services.google_maps.api_key") }}';
+
+    if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
+        // Fallback: Hide map and show manual input
+        document.getElementById('map').style.display = 'none';
+        document.querySelector('small.form-text').innerHTML =
+            '<i class="fas fa-info-circle me-1"></i>Please enter your full address manually.';
+        return;
+    }
+
+    // Load Google Maps API with marker library
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker&callback=initMap`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = function() {
+        console.error('Failed to load Google Maps API');
+        document.getElementById('map').style.display = 'none';
+        document.querySelector('small.form-text').innerHTML =
+            '<i class="fas fa-exclamation-triangle me-1"></i>Google Maps failed to load. Please enter your address manually.';
+    };
+    document.head.appendChild(script);
+}
+
+function initMap() {
+    // Initialize map
+    map = new google.maps.Map(document.getElementById('map'), {
+        center: { lat: 40.7128, lng: -74.0060 }, // Default to NYC
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false
+    });
+
+    // Initialize geocoder
+    geocoder = new google.maps.Geocoder();
+
+    // Initialize autocomplete
+    const addressInput = document.getElementById('customer_address');
+    autocomplete = new google.maps.places.Autocomplete(addressInput, {
+        types: ['address'],
+        componentRestrictions: { country: 'us' } // Restrict to US addresses
+    });
+
+    // Handle autocomplete selection
+    autocomplete.addListener('place_changed', function() {
+        const place = autocomplete.getPlace();
+        if (place.geometry) {
+            const location = place.geometry.location;
+            map.setCenter(location);
+            map.setZoom(16);
+
+            // Update marker using AdvancedMarkerElement
+            if (marker) {
+                marker.map = null;
+            }
+            marker = new google.maps.marker.AdvancedMarkerElement({
+                position: location,
+                map: map,
+                title: place.formatted_address
+            });
+
+            // Update hidden fields
+            document.getElementById('address_lat').value = location.lat();
+            document.getElementById('address_lng').value = location.lng();
+            document.getElementById('address_components').value = JSON.stringify(place.address_components);
+        }
+    });
+
+    // Handle map clicks
+    map.addListener('click', function(event) {
+        const location = event.latLng;
+
+        // Update marker using AdvancedMarkerElement
+        if (marker) {
+            marker.map = null;
+        }
+        marker = new google.maps.marker.AdvancedMarkerElement({
+            position: location,
+            map: map
+        });
+
+        // Reverse geocode to get address
+        geocoder.geocode({ location: location }, function(results, status) {
+            if (status === 'OK' && results[0]) {
+                const address = results[0].formatted_address;
+                document.getElementById('customer_address').value = address;
+                document.getElementById('address_lat').value = location.lat();
+                document.getElementById('address_lng').value = location.lng();
+                document.getElementById('address_components').value = JSON.stringify(results[0].address_components);
+            }
+        });
+    });
+
+    // Try to geocode existing address if any
+    const existingAddress = addressInput.value;
+    const existingLat = document.getElementById('address_lat').value;
+    const existingLng = document.getElementById('address_lng').value;
+
+    if (existingLat && existingLng) {
+        const location = new google.maps.LatLng(parseFloat(existingLat), parseFloat(existingLng));
+        map.setCenter(location);
+        map.setZoom(16);
+
+        marker = new google.maps.marker.AdvancedMarkerElement({
+            position: location,
+            map: map,
+            title: existingAddress
+        });
+    } else if (existingAddress) {
+        geocoder.geocode({ address: existingAddress }, function(results, status) {
+            if (status === 'OK' && results[0]) {
+                const location = results[0].geometry.location;
+                map.setCenter(location);
+                map.setZoom(16);
+
+                marker = new google.maps.marker.AdvancedMarkerElement({
+                    position: location,
+                    map: map,
+                    title: existingAddress
+                });
+            }
+        });
+    }
+}
+
+// Initialize Google Maps when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    initGoogleMaps();
 });
 </script>
 @endpush

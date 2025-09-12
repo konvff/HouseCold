@@ -15,6 +15,9 @@ class Appointment extends Model
         'customer_phone',
         'customer_email',
         'customer_address',
+        'address_lat',
+        'address_lng',
+        'address_components',
         'service_notes',
         'service_type_id',
         'technician_id',
@@ -30,6 +33,9 @@ class Appointment extends Model
         'estimated_duration_minutes' => 'integer',
         'estimated_cost' => 'decimal:2',
         'actual_cost' => 'decimal:2',
+        'address_lat' => 'decimal:8',
+        'address_lng' => 'decimal:8',
+        'address_components' => 'array',
         'status' => AppointmentStatus::class
     ];
 

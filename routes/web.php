@@ -33,6 +33,11 @@ Route::get('/', function () {
     return view('welcome');
 })->name('home');
 
+// Debug route for Google Maps
+Route::get('/debug-maps', function () {
+    return view('debug-maps');
+});
+
 Route::get('/book-appointment', [AppointmentController::class, 'create'])->name('appointments.create');
 Route::post('/book-appointment', [AppointmentController::class, 'store'])->name('appointments.store');
 Route::get('/available-slots', [AppointmentController::class, 'availableSlots'])->name('appointments.available-slots');

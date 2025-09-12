@@ -60,6 +60,9 @@ class AppointmentController extends Controller
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'required|string',
+            'address_lat' => 'nullable|numeric|between:-90,90',
+            'address_lng' => 'nullable|numeric|between:-180,180',
+            'address_components' => 'nullable|string',
             'service_type_id' => 'required|string|exists:service_types,id',
             'scheduled_at' => 'required|date|after:now',
             'service_notes' => 'nullable|string',
@@ -95,6 +98,9 @@ class AppointmentController extends Controller
                 'customer_phone' => $request->customer_phone,
                 'customer_email' => $request->customer_info['email'] ?? null,
                 'customer_address' => $request->customer_address,
+                'address_lat' => $request->address_lat,
+                'address_lng' => $request->address_lng,
+                'address_components' => $request->address_components ? json_decode($request->address_components, true) : null,
                 'service_type_id' => $request->service_type_id,
                 'scheduled_at' => $request->scheduled_at,
                 'service_notes' => $request->service_notes,
@@ -160,6 +166,9 @@ class AppointmentController extends Controller
             'customer_phone' => 'required|string|max:20',
             'customer_email' => 'nullable|email|max:255',
             'customer_address' => 'required|string',
+            'address_lat' => 'nullable|numeric|between:-90,90',
+            'address_lng' => 'nullable|numeric|between:-180,180',
+            'address_components' => 'nullable|string',
             'service_type_id' => 'required|exists:service_types,id',
             'scheduled_at' => 'required|date',
             'technician_id' => 'nullable|exists:technicians,id',
@@ -167,7 +176,13 @@ class AppointmentController extends Controller
         ]);
 
         $oldStatus = $appointment->status;
-        $appointment->update($request->all());
+
+        $updateData = $request->all();
+        if ($request->address_components) {
+            $updateData['address_components'] = json_decode($request->address_components, true);
+        }
+
+        $appointment->update($updateData);
 
         // Note: Payment auto-capture is handled by TechnicianController when timer is stopped
         // No need to duplicate the auto-capture logic here
